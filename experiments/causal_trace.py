@@ -470,9 +470,10 @@ class ModelAndTokenizer:
         self.tokenizer = tokenizer
         self.model = model
         self.layer_names = [
-            n
-            for n, m in model.named_modules()
-            if (re.match(r"^(transformer|gpt_neox)\.(h|layers)\.\d+$", n))
+            f"model.layers.{layer_num}" for layer_num in range(32)
+            # n
+            # for n, m in model.named_modules()
+            # if (re.match(r"^(transformer|gpt_neox)\.(h|layers)\.\d+$", n))
         ]
         self.num_layers = len(self.layer_names)
 
@@ -485,17 +486,25 @@ class ModelAndTokenizer:
 
 
 def layername(model, num, kind=None):
-    if hasattr(model, "transformer"):
-        if kind == "embed":
-            return "transformer.wte"
-        return f'transformer.h.{num}{"" if kind is None else "." + kind}'
-    if hasattr(model, "gpt_neox"):
-        if kind == "embed":
-            return "gpt_neox.embed_in"
-        if kind == "attn":
-            kind = "attention"
-        return f'gpt_neox.layers.{num}{"" if kind is None else "." + kind}'
-    assert False, "unknown transformer structure"
+    if kind == "attn":
+        return f"model.layers.{num}.self_attn"
+    elif kind == "mlp":
+        return f"model.layers.{num}.mlp"
+    elif kind == None:
+        return f"model.layers.{num}"
+    elif kind == "embed":
+        return f"model.embed_tokens"
+    # if hasattr(model, "transformer"):
+    #     if kind == "embed":
+    #         return "transformer.wte"
+    #     return f'transformer.h.{num}{"" if kind is None else "." + kind}'
+    # if hasattr(model, "gpt_neox"):
+    #     if kind == "embed":
+    #         return "gpt_neox.embed_in"
+    #     if kind == "attn":
+    #         kind = "attention"
+    #     return f'gpt_neox.layers.{num}{"" if kind is None else "." + kind}'
+    # assert False, "unknown transformer structure"
 
 
 def guess_subject(prompt):
@@ -541,10 +550,10 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
     )
     window = result.get("window", 10)
     labels = list(result["input_tokens"])
-    for i in range(*result["subject_range"]):
-        labels[i] = labels[i] + "*"
+    # for i in range(*result["subject_range"]):
+    #     labels[i] = labels[i] + "*"
 
-    with plt.rc_context(rc={"font.family": "Times New Roman"}):
+    with plt.rc_context():
         fig, ax = plt.subplots(figsize=(3.5, 2), dpi=200)
         h = ax.pcolor(
             differences,
@@ -557,9 +566,9 @@ def plot_trace_heatmap(result, savepdf=None, title=None, xlabel=None, modelname=
         ax.set_yticks([0.5 + i for i in range(len(differences))])
         ax.set_xticks([0.5 + i for i in range(0, differences.shape[1] - 6, 5)])
         ax.set_xticklabels(list(range(0, differences.shape[1] - 6, 5)))
-        ax.set_yticklabels(labels)
+        ax.set_yticklabels(labels, fontsize=4)
         if not modelname:
-            modelname = "GPT"
+            modelname = "Llama-2-7b"
         if not kind:
             ax.set_title("Impact of restoring state after corrupted input")
             ax.set_xlabel(f"single restored layer within {modelname}")
@@ -642,7 +651,6 @@ def predict_from_input(model, inp):
     probs = torch.softmax(out[:, -1], dim=1)
     p, preds = torch.max(probs, dim=1)
     return preds, p
-
 
 def collect_embedding_std(mt, subjects):
     alldata = []
